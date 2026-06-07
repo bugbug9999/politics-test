@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Analytics from "./Analytics";
+import { Analytics as VercelAnalytics } from "@vercel/analytics/next";
 
 export const metadata: Metadata = {
   title: "나는 어떤 정치성향?",
@@ -15,6 +16,7 @@ export default function RootLayout({
     <html lang="ko">
       <body>{children}</body>
       <Analytics />
+      <VercelAnalytics />
     </html>
   );
 }

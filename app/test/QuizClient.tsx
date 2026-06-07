@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { track as vaTrack } from "@vercel/analytics";
 import {
   QUESTIONS,
   INTERIM_AFTER,
@@ -48,9 +49,14 @@ const THEME = {
 
 // GA4 이벤트 (gtag 없으면 무시) — 방문/퍼널/공유 추적용
 function track(event: string, params?: Record<string, unknown>) {
+  if (typeof window === "undefined") return;
   const w = window as unknown as { gtag?: (...a: unknown[]) => void };
-  if (typeof window !== "undefined" && typeof w.gtag === "function") {
-    w.gtag("event", event, params || {});
+  if (typeof w.gtag === "function") w.gtag("event", event, params || {});
+  // Vercel Analytics 커스텀 이벤트 (문자열/숫자/불리언만 허용)
+  try {
+    vaTrack(event, (params as Record<string, string | number | boolean>) || {});
+  } catch {
+    /* noop */
   }
 }
 
