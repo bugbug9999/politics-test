@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import {
   QUESTIONS,
   INTERIM_AFTER,
@@ -237,11 +236,7 @@ export default function QuizClient() {
           >
             시작하기 →
           </button>
-          <div className="mt-6">
-            <Link href="/" className="text-sm text-gray-400 hover:text-gray-600">
-              ← 홈으로
-            </Link>
-          </div>
+          <GuestbookFeed />
         </div>
       </Shell>
     );
@@ -499,6 +494,51 @@ const TONE_TEXT: Record<string, string> = {
   cons: "text-red-600",
   center: "text-slate-600",
 };
+
+// 인트로용 — 남들이 남긴 방명록이 위로 흐르는 읽기전용 피드 (소셜 프루프)
+function GuestbookFeed() {
+  const [entries, setEntries] = useState<GbEntry[]>([]);
+  useEffect(() => {
+    fetch("/api/guestbook")
+      .then((r) => r.json())
+      .then((d) => setEntries((d.entries || []).slice(0, 12)))
+      .catch(() => {});
+  }, []);
+
+  const Row = ({ e }: { e: GbEntry }) => (
+    <div className="rounded-lg bg-gray-50 px-3 py-2 text-left text-xs leading-snug">
+      <b className="text-gray-700">{e.nick}</b>{" "}
+      <span className={`font-semibold ${TONE_TEXT[e.tone] || "text-slate-600"}`}>
+        {e.emoji} {e.type}
+      </span>
+      <span className="text-gray-500"> · {e.msg}</span>
+    </div>
+  );
+
+  return (
+    <div className="mt-8 break-keep">
+      <p className="mb-2 text-xs font-semibold text-gray-400">
+        💬 다들 한마디 남기고 지나가요
+      </p>
+      {entries.length === 0 ? (
+        <p className="rounded-lg bg-gray-50 px-3 py-3 text-center text-xs text-gray-400">
+          아직 조용해요 — 테스트하고 첫 한마디의 주인공이 되어보세요!
+        </p>
+      ) : (
+        <div className="gb-feed relative h-36 overflow-hidden">
+          <div className="gb-marquee space-y-1.5">
+            {entries.map((e, i) => (
+              <Row key={"a" + i} e={e} />
+            ))}
+            {entries.map((e, i) => (
+              <Row key={"b" + i} e={e} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function Guestbook({
   type,

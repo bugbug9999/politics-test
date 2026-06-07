@@ -19,3 +19,18 @@ body {
   background: var(--background);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* 방명록 인트로 피드 — 위로 흐르는 마키 + 위아래 페이드 */
+.gb-feed {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 14%, #000 86%, transparent);
+}
+.gb-marquee { animation: gb-scroll 22s linear infinite; }
+.gb-marquee:hover { animation-play-state: paused; }
+@keyframes gb-scroll {
+  from { transform: translateY(0); }
+  to { transform: translateY(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .gb-marquee { animation: none; }
+}
