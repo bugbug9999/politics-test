@@ -78,8 +78,8 @@ const QUESTIONS_RAW: Question[] = [
     options: [
       { label: "명백한 내란, 헌정 유린이다", scores: { camp: -2, mlSeverity: 2 } },
       { label: "분명히 잘못된 일이다", scores: { camp: -1, mlSeverity: 1 } },
-      { label: "그럴 만한 사정이 있었다", scores: { camp: 1, mlSeverity: -1 } },
-      { label: "계엄? 솔직히 별일 아니었다", scores: { camp: 1, mlSeverity: -2 } },
+      { label: "야당 입법폭주에 맞선 고육지책이었다", scores: { camp: 1, mlSeverity: -1 } },
+      { label: "내란몰이가 과하다, 통치행위로 볼 여지 있다", scores: { camp: 1, mlSeverity: -2 } },
     ],
   },
   {

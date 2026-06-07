@@ -8,6 +8,7 @@ import {
   coarseResult,
   score,
   type Coarse,
+  type Question,
   type QuestionOption,
   type Result,
 } from "./quizData";
@@ -60,6 +61,19 @@ function track(event: string, params?: Record<string, unknown>) {
   }
 }
 
+// 선택지 순서 편향 제거 — 매 세션 옵션 셔플. q1(진보~보수 스펙트럼)은 가독성 위해 제외.
+function shuffleQuiz(): Question[] {
+  return QUESTIONS.map((q) => {
+    if (q.id === "q1") return q;
+    const opts = [...q.options];
+    for (let i = opts.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [opts[i], opts[j]] = [opts[j], opts[i]];
+    }
+    return { ...q, options: opts };
+  });
+}
+
 type Stage = "intro" | "quiz" | "interim" | "result";
 
 export default function QuizClient() {
@@ -72,6 +86,8 @@ export default function QuizClient() {
   const [saving, setSaving] = useState(false);
   const [host, setHost] = useState("");
   useEffect(() => setHost(window.location.host), []);
+  // 옵션 순서를 매 세션 셔플한 문항 세트 (시작 시 생성)
+  const [quizQs, setQuizQs] = useState<Question[]>(QUESTIONS);
 
   const result: Result | null = useMemo(() => {
     if (stage !== "result") return null;
@@ -236,6 +252,7 @@ export default function QuizClient() {
           <button
             onClick={() => {
               track("test_start");
+              setQuizQs(shuffleQuiz());
               setStage("quiz");
             }}
             className="rounded-2xl bg-pink-600 px-10 py-4 text-lg font-bold text-white shadow-lg transition hover:bg-pink-700"
@@ -250,7 +267,7 @@ export default function QuizClient() {
 
   // ─────────────────────────── 퀴즈 ───────────────────────────
   if (stage === "quiz") {
-    const q = QUESTIONS[idx];
+    const q = quizQs[idx];
     return (
       <Shell>
         {/* 진행 바 */}
