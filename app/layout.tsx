@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import Analytics from "./Analytics";
 
 export const metadata: Metadata = {
   title: "나는 어떤 정치성향?",
@@ -13,6 +14,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body>{children}</body>
+      <Analytics />
     </html>
   );
 }

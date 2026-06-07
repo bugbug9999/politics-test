@@ -47,6 +47,14 @@ const THEME = {
   },
 } as const;
 
+// GA4 이벤트 (gtag 없으면 무시) — 방문/퍼널/공유 추적용
+function track(event: string, params?: Record<string, unknown>) {
+  const w = window as unknown as { gtag?: (...a: unknown[]) => void };
+  if (typeof window !== "undefined" && typeof w.gtag === "function") {
+    w.gtag("event", event, params || {});
+  }
+}
+
 type Stage = "intro" | "quiz" | "interim" | "result";
 
 export default function QuizClient() {
@@ -71,6 +79,13 @@ export default function QuizClient() {
       answers.slice(0, INTERIM_AFTER).filter(Boolean) as QuestionOption[]
     );
   }, [stage, answers]);
+
+  // 퍼널 추적: 1차 진단 도달 / 정밀 결과 도달
+  useEffect(() => {
+    if (stage === "interim" && coarse) track("interim_reached", { coarse: coarse.label });
+    if (stage === "result" && result)
+      track("result_reached", { type: result.archetype.name, code: result.archetype.code });
+  }, [stage, coarse, result]);
 
   const progress = Math.round((idx / QUESTIONS.length) * 100);
 
@@ -101,6 +116,7 @@ export default function QuizClient() {
   async function saveImage() {
     const el = cardRef.current;
     if (!el || !result) return;
+    track("save_image", { type: result.archetype.name });
     setSaving(true);
     try {
       // 웹폰트 로딩 보장 — 안 기다리면 html2canvas가 폴백폰트(다른 메트릭)로 그려 간격이 깨짐
@@ -161,6 +177,7 @@ export default function QuizClient() {
   async function share() {
     if (!result) return;
     const a = result.archetype;
+    track("share_click", { type: a.name });
     const badgeText = result.badges.map((b) => `${b.emoji}${b.name}`).join(" ");
     const text =
       `나는 [${a.emoji} ${a.name}] 나왔다.\n` +
@@ -212,7 +229,10 @@ export default function QuizClient() {
             결과는 자가진단일 뿐 누군가를 규정하지 않습니다.
           </p>
           <button
-            onClick={() => setStage("quiz")}
+            onClick={() => {
+              track("test_start");
+              setStage("quiz");
+            }}
             className="rounded-2xl bg-pink-600 px-10 py-4 text-lg font-bold text-white shadow-lg transition hover:bg-pink-700"
           >
             시작하기 →
@@ -450,6 +470,8 @@ export default function QuizClient() {
           </button>
         </div>
 
+        <Guestbook type={a.name} emoji={a.emoji} tone={faction} />
+
         <p className="mt-6 text-center text-xs text-gray-400 leading-relaxed">
           이 테스트는 풍자·오락용이며 학술적 진단이 아닙니다.
           <br />
@@ -461,6 +483,140 @@ export default function QuizClient() {
   }
 
   return null;
+}
+
+// ─────────────────────────── 방명록 ───────────────────────────
+type GbEntry = {
+  nick: string;
+  msg: string;
+  type: string;
+  emoji: string;
+  tone: "prog" | "cons" | "center";
+  ts: number;
+};
+const TONE_TEXT: Record<string, string> = {
+  prog: "text-blue-600",
+  cons: "text-red-600",
+  center: "text-slate-600",
+};
+
+function Guestbook({
+  type,
+  emoji,
+  tone,
+}: {
+  type: string;
+  emoji: string;
+  tone: "prog" | "cons" | "center";
+}) {
+  const [entries, setEntries] = useState<GbEntry[]>([]);
+  const [configured, setConfigured] = useState(true);
+  const [nick, setNick] = useState("");
+  const [msg, setMsg] = useState("");
+  const [sending, setSending] = useState(false);
+  const [err, setErr] = useState("");
+
+  useEffect(() => {
+    fetch("/api/guestbook")
+      .then((r) => r.json())
+      .then((d) => {
+        setEntries(d.entries || []);
+        setConfigured(d.configured !== false);
+      })
+      .catch(() => setConfigured(false));
+  }, []);
+
+  async function submit() {
+    if (!msg.trim() || sending) return;
+    setSending(true);
+    setErr("");
+    try {
+      const r = await fetch("/api/guestbook", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nick, msg, type, emoji, tone }),
+      });
+      const d = await r.json();
+      if (d.ok) {
+        track("guestbook_submit", { type });
+        setEntries((prev) => [d.entry, ...prev]);
+        setMsg("");
+        setNick("");
+      } else setErr(d.error || "남기지 못했어요.");
+    } catch {
+      setErr("네트워크 오류가 났어요.");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="mt-8 break-keep">
+      <h3 className="text-lg font-extrabold text-gray-900">📝 방명록</h3>
+      <p className="mt-1 text-xs text-gray-400">
+        내 유형과 함께 한마디 남기기 · 누구나 볼 수 있어요
+      </p>
+
+      {!configured ? (
+        <p className="mt-3 rounded-xl bg-gray-50 p-4 text-center text-sm text-gray-400">
+          방명록 준비 중이에요. 곧 열려요!
+        </p>
+      ) : (
+        <>
+          <div className="mt-3 flex flex-col gap-2">
+            <input
+              value={nick}
+              onChange={(e) => setNick(e.target.value)}
+              maxLength={12}
+              placeholder="닉네임 (1회용)"
+              className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-gray-400 focus:outline-none"
+            />
+            <textarea
+              value={msg}
+              onChange={(e) => setMsg(e.target.value)}
+              maxLength={200}
+              rows={2}
+              placeholder="한마디 남기기… (최대 200자)"
+              className="resize-none rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-gray-400 focus:outline-none"
+            />
+            {err && <p className="text-xs text-red-500">{err}</p>}
+            <button
+              onClick={submit}
+              disabled={sending || !msg.trim()}
+              className="rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-black disabled:opacity-40"
+            >
+              {sending ? "남기는 중…" : `${emoji} ${type}(으)로 남기기`}
+            </button>
+          </div>
+
+          <div className="mt-5 space-y-2.5">
+            {entries.length === 0 && (
+              <p className="py-2 text-center text-xs text-gray-300">
+                아직 방명록이 없어요. 첫 한마디를 남겨보세요!
+              </p>
+            )}
+            {entries.map((e, i) => (
+              <div key={i} className="rounded-xl bg-gray-50 p-3 text-left">
+                <p className="text-xs">
+                  <b className="text-gray-800">{e.nick}</b>
+                  <span
+                    className={`ml-1.5 font-semibold ${
+                      TONE_TEXT[e.tone] || "text-slate-600"
+                    }`}
+                  >
+                    {e.emoji} {e.type}
+                  </span>
+                </p>
+                <p className="mt-1 text-sm leading-relaxed text-gray-700">
+                  {e.msg}
+                </p>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 // 유형 일러스트 슬롯: /test-images/{ID}.png 가 있으면 사용, 없으면 이모지로 폴백.
